@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>CEPEL IMA-Acustico</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f4; }
+    h2 { text-align: center; }
+    #fileInput { display: block; margin: 20px auto; }
+    #grafico { width: 100%; max-width: 900px; height: 600px; margin: auto; }
+  </style>
+</head>
+<body>
+
+  <h2>Análise de Ensaio de Emissão Acústica</h2>
+  <input type="file" id="fileInput" accept=".txt,.csv" />
+  <div id="grafico"></div>
+
+  <script>
+    function interpolarCores(valor) {
+      const pontoLaranja = 60; // valor real entre 0 e 100
+      if (valor <= pontoLaranja) {
+        const t = valor / pontoLaranja;
+        const r = Math.round(t * 255);
+        const g = Math.round(150 + t * (200 - 150));
+        const b = Math.round(t * 100);
+        return `rgb(${r},${g},${b})`;
+      } else {
+        const t = (valor - pontoLaranja) / (100 - pontoLaranja);
+        const r = Math.round(255 - t * (255 - 200));
+        const g = Math.round(200 - t * 200);
+        const b = Math.round(100 - t * 100);
+        return `rgb(${r},${g},${b})`;
+      }
+    }
+
+    function gerarEscalaGradiente() {
+      return Array.from({ length: 21 }, (_, i) => {
+        const v = i * 5; // 0, 5, 10, ..., 100
+        return [v / 100, interpolarCores(v)];
+      });
+    }
+
+    document.getElementById('fileInput').addEventListener('change', function(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const linhas = e.target.result.trim().split('\n');
+        const matriz = linhas.map(l => l.trim().split(/[,\s]+/).map(Number));
+
+        const maxCols = Math.max(...matriz.map(row => row.length));
+        const padded = matriz.map(row => {
+          const nova = [...row];
+          while (nova.length < maxCols) nova.push(NaN);
+          return nova;
+        });
+
+        const colLabels = Array.from({ length: maxCols }, (_, i) => `M${i + 1}`);
+        const rowLabels = Array.from({ length: padded.length }, (_, i) => `S ${i + 1}`);
+
+        Plotly.newPlot('grafico', [{
+          z: padded,
+          x: colLabels,
+          y: rowLabels,
+          type: 'heatmap',
+          colorscale: gerarEscalaGradiente(),
+          zmin: 0,
+          zmax: 100,
+          showscale: true
+        }], {
+          title: 'Classificação dos sinais de DP por sensor ao longo da medição',
+          yaxis: { autorange: 'reversed' },
+          margin: { t: 50 }
+        }, { responsive: true });
+      };
+
+      reader.readAsText(file);
+    });
+  </script>
+
+</body>
+</html>
